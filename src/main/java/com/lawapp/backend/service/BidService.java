@@ -17,6 +17,7 @@ public class BidService {
     private final UserRepository userRepository;
     private final LeadRepository leadRepository;
     private final NotificationService notificationService;
+    private final ChatSessionRepository chatSessionRepository;
 
     private BigDecimal getBidCostByCategory(String category) {
         if (category == null) return BigDecimal.valueOf(20.0);
@@ -121,6 +122,17 @@ public class BidService {
 
         bidRepository.save(bid);
         leadRepository.save(lead);
+
+        // Otomatik olarak ChatSession oluştur (varsa tekrar oluşturma)
+        if (chatSessionRepository.findByLeadIdAndLawyerId(lead.getId(), bid.getLawyer().getId()).isEmpty()) {
+            ChatSession chatSession = ChatSession.builder()
+                    .lead(lead)
+                    .client(client)
+                    .lawyer(bid.getLawyer())
+                    .active(true)
+                    .build();
+            chatSessionRepository.save(chatSession);
+        }
 
         // Avukata kabul edildiğine dair bildirim gönder
         notificationService.sendNotification(
