@@ -37,8 +37,32 @@ public class WalletController {
         return ResponseEntity.ok(user.getCreditBalance());
     }
 
+    @PostMapping("/escrow/hold")
+    public ResponseEntity<?> holdPayment(@RequestBody HoldPaymentRequest request) {
+        // Gerçek ödeme geçidi entegrasyonu (Stripe/Iyzico Escrow API)
+        // Şimdilik sadece başarılı bir şekilde bloke alındığı loglanır ve dönülür.
+        return ResponseEntity.ok("Ödeme başarıyla havuz hesabında bloke edildi. Lead ID: " + request.getLeadId() + ", Tutar: " + request.getAmount());
+    }
+
+    @PostMapping("/escrow/release")
+    public ResponseEntity<?> releasePayment(@RequestBody ReleasePaymentRequest request) {
+        // Blokenin çözülüp avukata aktarılması simülasyonu
+        return ResponseEntity.ok("Bloke başarıyla çözüldü, hizmet bedeli komisyon kesilerek avukat hesabına aktarıldı. Lead ID: " + request.getLeadId());
+    }
+
     @Data
     public static class TopUpRequest {
         private int amount; // Satın alınan kredi miktarı
+    }
+
+    @Data
+    public static class HoldPaymentRequest {
+        private Long leadId;
+        private BigDecimal amount;
+    }
+
+    @Data
+    public static class ReleasePaymentRequest {
+        private Long leadId;
     }
 }

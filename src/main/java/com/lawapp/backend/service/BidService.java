@@ -43,7 +43,7 @@ public class BidService {
         }
 
         if (!lawyer.isVerified()) {
-            throw new RuntimeException("Hesabınız henüz doğrulanmamış. Lütfen baro numaranızı kayıt ettirin.");
+            throw new RuntimeException("Hesabınız henüz doğrulanmamış. Lütfen baro numaranızı ve ruhsat belgenizi kaydedip sistem onayını bekleyin.");
         }
 
         Lead lead = leadRepository.findById(leadId)
@@ -80,8 +80,8 @@ public class BidService {
         // Müvekkile haber ver
         notificationService.sendNotification(
             lead.getClient().getId(), 
-            "Yeni Teklif!", 
-            lawyer.getFullName() + " isimli avukat ilanınıza teklif verdi."
+            "Yeni Ön Görüşme Başvurusu!", 
+            lawyer.getFullName() + " isimli avukat danışmanlık talebinize ön görüşme başvurusu gönderdi."
         );
 
         return savedBid;
@@ -137,8 +137,8 @@ public class BidService {
         // Avukata kabul edildiğine dair bildirim gönder
         notificationService.sendNotification(
             bid.getLawyer().getId(),
-            "Teklifiniz Kabul Edildi!",
-            "Müvekkil teklifinizi kabul etti. İletişim bilgilerini görüntüleyebilirsiniz."
+            "Ön Görüşme Talebiniz Kabul Edildi!",
+            "Müvekkil başvurunuzu onayladı. Sohbet odası üzerinden güvenli ön görüşmeye başlayabilirsiniz."
         );
 
         return bid;

@@ -41,6 +41,15 @@ public class User {
     @Column(unique = true)
     private String barNumber; // Baro sicil numarası - sadece avukatlar için
 
+    private String barLicenseImageUrl; // Avukat ruhsat belgesi görseli
+    
+    private Double averageRating; // Ortalama değerlendirme puanı
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_specialties", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "specialty")
+    private java.util.Set<String> specialties = new java.util.HashSet<>();
+
     @com.fasterxml.jackson.annotation.JsonIgnore
     private String fcmToken; // FCM Push Notification Token
 
