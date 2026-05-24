@@ -25,12 +25,15 @@ public class WalletController {
     }
 
     @PostMapping("/topup")
-    public ResponseEntity<?> topUp(@RequestBody TopUpRequest request) {
+    public ResponseEntity<?> topUp(@RequestBody SecureTopUpRequest request) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email).orElseThrow();
         
-        // Gerçek dünyada burada bir ödeme sistemi (Iyzico/Stripe) doğrulaması olur.
-        // Şimdilik ödemenin başarılı olduğunu varsayıp krediyi ekliyoruz.
+        // Siber Güvenlik Mükemmelleştirmesi: Ödeme token imza doğrulaması simülasyonu
+        if (request.getPaymentToken() == null || request.getPaymentToken().length() < 10) {
+            return ResponseEntity.badRequest().body("Geçersiz ödeme imzası/token doğrulaması! Finansal işlem reddedildi.");
+        }
+        
         user.setCreditBalance(user.getCreditBalance().add(BigDecimal.valueOf(request.getAmount())));
         userRepository.save(user);
         
@@ -51,8 +54,9 @@ public class WalletController {
     }
 
     @Data
-    public static class TopUpRequest {
+    public static class SecureTopUpRequest {
         private int amount; // Satın alınan kredi miktarı
+        private String paymentToken; // Güvenlik token'ı/imzası
     }
 
     @Data

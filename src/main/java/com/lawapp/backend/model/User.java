@@ -53,6 +53,9 @@ public class User {
     @com.fasterxml.jackson.annotation.JsonIgnore
     private String fcmToken; // FCM Push Notification Token
 
+    @Version
+    private Long version; // Optimistic locking sürüm kontrolü (Eşzamanlı bakiye güncellemelerini önler)
+
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private LawyerProfile lawyerProfile;
 

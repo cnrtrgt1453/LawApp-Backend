@@ -91,6 +91,27 @@ public class BidService {
         return bidRepository.findByLeadId(leadId);
     }
 
+    public List<Bid> getBidsForLeadWithAuth(Long leadId, String userEmail) {
+        User requester = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        Lead lead = leadRepository.findById(leadId)
+                .orElseThrow(() -> new RuntimeException("Lead not found"));
+        
+        // Güvenlik Kontrolü: 
+        // 1. İsteği atan kişi CLIENT ise, ilanı açan müvekkil olmalı.
+        // 2. İsteği atan kişi LAWYER ise, doğrulanmış (verified) bir avukat olmalı.
+        if (requester.getRole() == Role.CLIENT && !lead.getClient().getId().equals(requester.getId())) {
+            throw new RuntimeException("Bu talebin başvurularını görüntüleme yetkiniz yoktur!");
+        }
+        
+        if (requester.getRole() == Role.LAWYER && !requester.isVerified()) {
+            throw new RuntimeException("Başvuruları görüntülemek için doğrulanmış avukat olmalısınız!");
+        }
+
+        return bidRepository.findByLeadId(leadId);
+    }
+
     @Transactional
     public Bid acceptBid(Long bidId, String clientEmail) {
         User client = userRepository.findByEmail(clientEmail)

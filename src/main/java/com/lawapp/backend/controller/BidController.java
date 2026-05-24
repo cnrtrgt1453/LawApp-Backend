@@ -29,10 +29,14 @@ public class BidController {
     }
 
     @GetMapping("/lead/{leadId}")
-    public ResponseEntity<List<Bid>> getBidsByLead(@PathVariable Long leadId) {
-        // Güvenlik kontrolü: Sadece ilanı açan müvekkil kendi ilanının tekliflerini görebilmeli.
-        // Bu aşamada avukatın iletişim bilgileri de (telefon vb.) müvekkile açık hale gelir.
-        return ResponseEntity.ok(bidService.getBidsForLead(leadId));
+    public ResponseEntity<?> getBidsByLead(@PathVariable Long leadId) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        try {
+            List<Bid> bids = bidService.getBidsForLeadWithAuth(leadId, email);
+            return ResponseEntity.ok(bids);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(403).body(e.getMessage());
+        }
     }
 
     @PostMapping("/{bidId}/accept")
