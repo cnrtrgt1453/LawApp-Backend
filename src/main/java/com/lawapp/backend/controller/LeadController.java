@@ -75,6 +75,47 @@ public class LeadController {
                 .collect(Collectors.toList());
     }
 
+    @GetMapping("/{id}/matching-lawyers")
+    public ResponseEntity<List<LawyerDto>> getMatchingLawyers(@PathVariable Long id) {
+        Lead lead = leadRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Lead not found"));
+
+        List<User> lawyers = userRepository.findLawyersBySpecialty(lead.getCategory());
+        
+        List<LawyerDto> dtos = lawyers.stream().map(lawyer -> {
+            LawyerDto dto = new LawyerDto();
+            dto.setId(lawyer.getId());
+            dto.setFullName(lawyer.getFullName());
+            dto.setAverageRating(lawyer.getAverageRating() != null ? lawyer.getAverageRating() : 5.0);
+            dto.setSpecialties(lawyer.getSpecialties());
+            dto.setPhoneNumber(lawyer.getPhoneNumber());
+            dto.setBarNumber(lawyer.getBarNumber());
+            dto.setVerified(lawyer.isVerified());
+            if (lawyer.getLawyerProfile() != null) {
+                dto.setBio(lawyer.getLawyerProfile().getBio());
+                dto.setProfileImageUrl(lawyer.getLawyerProfile().getProfileImageUrl());
+                dto.setIntroVideoUrl(lawyer.getLawyerProfile().getIntroVideoUrl());
+            }
+            return dto;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(dtos);
+    }
+
+    @Data
+    public static class LawyerDto {
+        private Long id;
+        private String fullName;
+        private Double averageRating;
+        private java.util.Set<String> specialties;
+        private String phoneNumber;
+        private String barNumber;
+        private boolean verified;
+        private String bio;
+        private String profileImageUrl;
+        private String introVideoUrl;
+    }
+
     @Data
     public static class LeadResponseDto {
         private Long id;

@@ -5,10 +5,12 @@ import com.lawapp.backend.model.ClientProfile;
 import com.lawapp.backend.model.LawyerProfile;
 import com.lawapp.backend.model.Role;
 import com.lawapp.backend.model.User;
-import com.lawapp.backend.repository.BidRepository;
+import com.lawapp.backend.model.AppointmentStatus;
+import com.lawapp.backend.repository.AppointmentRepository;
 import com.lawapp.backend.repository.ClientProfileRepository;
 import com.lawapp.backend.repository.LawyerProfileRepository;
 import com.lawapp.backend.repository.UserRepository;
+import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +22,7 @@ public class ProfileService {
     private final LawyerProfileRepository profileRepository;
     private final ClientProfileRepository clientProfileRepository;
     private final UserRepository userRepository;
-    private final BidRepository bidRepository;
+    private final AppointmentRepository appointmentRepository;
 
     public LawyerProfile getProfile(Long userId) {
         return profileRepository.findById(userId)
@@ -58,8 +60,11 @@ public class ProfileService {
     }
 
     public ClientProfile getClientProfileForLawyer(Long lawyerId, Long clientId) {
-        if (!bidRepository.existsByLawyerIdAndLeadClientId(lawyerId, clientId)) {
-            throw new RuntimeException("Access denied: You must bid on one of this client's leads to view their profile.");
+        boolean hasAppointment = appointmentRepository.existsByLawyerIdAndClientIdAndStatusIn(
+                lawyerId, clientId, Arrays.asList(AppointmentStatus.PENDING, AppointmentStatus.ACCEPTED, AppointmentStatus.COMPLETED)
+        );
+        if (!hasAppointment) {
+            throw new RuntimeException("Access denied: You must have an active appointment request with this client to view their profile.");
         }
         return getClientProfile(clientId);
     }
