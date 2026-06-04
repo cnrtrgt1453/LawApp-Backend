@@ -4,8 +4,8 @@ import com.lawapp.backend.model.ChatMessage;
 import com.lawapp.backend.model.ChatSession;
 import com.lawapp.backend.model.User;
 import com.lawapp.backend.repository.ChatMessageRepository;
-import com.lawapp.backend.repository.ChatSessionRepository;
 import com.lawapp.backend.repository.UserRepository;
+import com.lawapp.backend.service.ChatService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,96 +20,88 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ChatController {
 
-    private final ChatSessionRepository chatSessionRepository;
-    private final ChatMessageRepository chatMessageRepository;
+    private final ChatService chatService;
     private final UserRepository userRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     @GetMapping
     public ResponseEntity<List<ChatSessionResponseDto>> getMyChats() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        try {
+            User currentUser = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            List<ChatSession> sessions = chatService.getMyChatSessions(email);
 
-        List<ChatSession> sessions = chatSessionRepository.findByClientIdOrLawyerIdOrderByCreatedAtDesc(
-                currentUser.getId(), currentUser.getId());
+            List<ChatSessionResponseDto> dtos = sessions.stream().map(session -> {
+                ChatSessionResponseDto dto = new ChatSessionResponseDto();
+                dto.setId(session.getId());
+                dto.setLeadId(session.getLead().getId());
+                dto.setLeadTitle(session.getLead().getTitle());
 
-        List<ChatSessionResponseDto> dtos = sessions.stream().map(session -> {
-            ChatSessionResponseDto dto = new ChatSessionResponseDto();
-            dto.setId(session.getId());
-            dto.setLeadId(session.getLead().getId());
-            dto.setLeadTitle(session.getLead().getTitle());
+                // Karşı tarafın bilgilerini belirle
+                User otherUser = session.getClient().getId().equals(currentUser.getId()) ?
+                        session.getLawyer() : session.getClient();
 
-            // Karşı tarafın bilgilerini belirle
-            User otherUser = session.getClient().getId().equals(currentUser.getId()) ?
-                    session.getLawyer() : session.getClient();
+                dto.setOtherParticipantName(otherUser.getFullName());
+                dto.setOtherParticipantRole(otherUser.getRole().name());
 
-            dto.setOtherParticipantName(otherUser.getFullName());
-            dto.setOtherParticipantRole(otherUser.getRole().name());
+                // Son mesajı ve okunmamış sayısını çek
+                ChatMessage lastMsg = chatMessageRepository.findFirstBySessionIdOrderByCreatedAtDesc(session.getId());
+                if (lastMsg != null) {
+                    dto.setLastMessage(lastMsg.getContent());
+                    dto.setLastMessageTime(lastMsg.getCreatedAt().toString());
+                } else {
+                    dto.setLastMessage("Henüz mesaj yok. Görüşmeyi başlatın!");
+                    dto.setLastMessageTime(session.getCreatedAt().toString());
+                }
 
-            // Son mesajı ve okunmamış sayısını çek
-            ChatMessage lastMsg = chatMessageRepository.findFirstBySessionIdOrderByCreatedAtDesc(session.getId());
-            if (lastMsg != null) {
-                dto.setLastMessage(lastMsg.getContent());
-                dto.setLastMessageTime(lastMsg.getCreatedAt().toString());
-            } else {
-                dto.setLastMessage("Henüz mesaj yok. Görüşmeyi başlatın!");
-                dto.setLastMessageTime(session.getCreatedAt().toString());
-            }
+                long unread = chatMessageRepository.countBySessionIdAndSenderIdNotAndReadFalse(
+                        session.getId(), currentUser.getId());
+                dto.setUnreadCount(unread);
 
-            long unread = chatMessageRepository.countBySessionIdAndSenderIdNotAndReadFalse(
-                    session.getId(), currentUser.getId());
-            dto.setUnreadCount(unread);
+                return dto;
+            }).collect(Collectors.toList());
 
-            return dto;
-        }).collect(Collectors.toList());
-
-        return ResponseEntity.ok(dtos);
+            return ResponseEntity.ok(dtos);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @GetMapping("/{sessionId}/messages")
     public ResponseEntity<List<ChatMessageResponseDto>> getChatMessages(@PathVariable Long sessionId) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        try {
+            List<ChatMessage> messages = chatService.getChatMessages(email, sessionId);
+            List<ChatMessageResponseDto> dtos = messages.stream().map(msg -> {
+                ChatMessageResponseDto dto = new ChatMessageResponseDto();
+                dto.setId(msg.getId());
+                dto.setSenderEmail(msg.getSender().getEmail());
+                dto.setSenderName(msg.getSender().getFullName());
+                dto.setContent(msg.getContent());
+                dto.setCreatedAt(msg.getCreatedAt().toString());
+                dto.setRead(msg.isRead());
+                dto.setFileUrl(msg.getFileUrl());
+                return dto;
+            }).collect(Collectors.toList());
 
-        ChatSession session = chatSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
-
-        // Odaya dahil mi kontrol et
-        if (!session.getClient().getId().equals(currentUser.getId()) &&
-                !session.getLawyer().getId().equals(currentUser.getId())) {
+            return ResponseEntity.ok(dtos);
+        } catch (SecurityException e) {
             return ResponseEntity.status(403).build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
         }
-
-        List<ChatMessage> messages = chatMessageRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
-        List<ChatMessageResponseDto> dtos = messages.stream().map(msg -> {
-            ChatMessageResponseDto dto = new ChatMessageResponseDto();
-            dto.setId(msg.getId());
-            dto.setSenderEmail(msg.getSender().getEmail());
-            dto.setSenderName(msg.getSender().getFullName());
-            dto.setContent(msg.getContent());
-            dto.setCreatedAt(msg.getCreatedAt().toString());
-            dto.setRead(msg.isRead());
-            dto.setFileUrl(msg.getFileUrl());
-            return dto;
-        }).collect(Collectors.toList());
-
-        return ResponseEntity.ok(dtos);
     }
 
     @PostMapping("/{sessionId}/read")
     public ResponseEntity<?> markAsRead(@PathVariable Long sessionId) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User currentUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        List<ChatMessage> unreadMessages = chatMessageRepository.findBySessionIdAndSenderIdNotAndReadFalse(
-                sessionId, currentUser.getId());
-
-        unreadMessages.forEach(msg -> msg.setRead(true));
-        chatMessageRepository.saveAll(unreadMessages);
-
-        return ResponseEntity.ok().build();
+        try {
+            chatService.markMessagesAsRead(email, sessionId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @Data
