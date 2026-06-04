@@ -65,10 +65,9 @@ public class ProfileController {
     public ResponseEntity<?> uploadVideo(@RequestParam("file") MultipartFile file) {
         User user = getCurrentUser();
         
-        // 5 dakika kontrolü (basit bir boyut kontrolü ile simüle edilebilir veya metadata bakılabilir)
-        // Burada sadece dosyanın varlığını kontrol edip simüle ediyoruz.
-        if (file.getSize() > 50 * 1024 * 1024) { // Örn: 50MB sınırı
-             return ResponseEntity.badRequest().body("Video dosyası çok büyük (max 50MB).");
+        // 90 saniye kontrolü (simüle edilen boyut sınırını 15MB'a indiriyoruz)
+        if (file.getSize() > 15 * 1024 * 1024) { // 15MB sınırı
+             return ResponseEntity.badRequest().body("Video dosyası çok büyük veya 90 saniyeden uzun (max 15MB).");
         }
 
         String videoUrl = "https://lawapp-storage.com/videos/" + user.getId() + "_" + file.getOriginalFilename();
