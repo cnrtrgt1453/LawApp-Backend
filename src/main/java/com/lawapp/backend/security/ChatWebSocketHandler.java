@@ -39,16 +39,16 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String query = session.getUri().getQuery();
-        String token = parseToken(query);
+        // JWT doğrulaması artık JwtHandshakeInterceptor tarafından yapılıyor.
+        // Burada sadece interceptor'ın set ettiği email attribute'unu kontrol ediyoruz.
+        String email = (String) session.getAttributes().get("email");
+        Boolean authenticated = (Boolean) session.getAttributes().get("authenticated");
 
-        if (token != null && jwtUtils.validateJwtToken(token)) {
-            String email = jwtUtils.getUserNameFromJwtToken(token);
-            session.getAttributes().put("email", email);
+        if (email != null && Boolean.TRUE.equals(authenticated)) {
             activeSessions.put(email, session);
-            logger.info("WebSocket connection established for user: {}", email);
+            logger.info("WebSocket connection established for user: {}", maskEmail(email));
         } else {
-            logger.warn("WebSocket connection rejected: Invalid JWT token");
+            logger.warn("WebSocket connection rejected: Missing authentication attributes from handshake");
             session.close(CloseStatus.BAD_DATA);
         }
     }
@@ -74,16 +74,20 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             boolean isLawyer = chatSession.getLawyer().getId().equals(sender.getId());
 
             if (!isClient && !isLawyer) {
-                logger.warn("User {} tried to send message to unauthorized chat session {}", email, payload.getSessionId());
+                logger.warn("User {} tried to send message to unauthorized chat session {}", maskEmail(email), payload.getSessionId());
                 return;
             }
+
+            // Mesaj içeriğini sanitize et (XSS koruması)
+            String sanitizedContent = sanitizeInput(payload.getContent());
+            String sanitizedFileUrl = sanitizeFileUrl(payload.getFileUrl());
 
             // Mesajı kaydet
             ChatMessage chatMessage = ChatMessage.builder()
                     .session(chatSession)
                     .sender(sender)
-                    .content(payload.getContent())
-                    .fileUrl(payload.getFileUrl())
+                    .content(sanitizedContent)
+                    .fileUrl(sanitizedFileUrl)
                     .read(false)
                     .build();
 
@@ -114,15 +118,15 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
             if (recipientSession != null && recipientSession.isOpen()) {
                 recipientSession.sendMessage(textResponse);
-                logger.info("Message sent in real-time to online user: {}", recipient.getEmail());
+                logger.info("Message sent in real-time to online user: {}", maskEmail(recipient.getEmail()));
             } else {
                 // Çevrimdışı ise push notification gönder
                 notificationService.sendNotification(
                         recipient.getId(),
                         "Yeni Mesaj: " + sender.getFullName(),
-                        payload.getContent()
+                        sanitizedContent
                 );
-                logger.info("User {} is offline. Push notification triggered.", recipient.getEmail());
+                logger.info("User {} is offline. Push notification triggered.", maskEmail(recipient.getEmail()));
             }
 
         } catch (Exception e) {
@@ -135,21 +139,56 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         String email = (String) session.getAttributes().get("email");
         if (email != null) {
             activeSessions.remove(email);
-            logger.info("WebSocket connection closed for user: {}", email);
+            logger.info("WebSocket connection closed for user: {}", maskEmail(email));
         }
     }
 
-    private String parseToken(String query) {
-        if (query != null && query.contains("token=")) {
-            String[] params = query.split("&");
-            for (String param : params) {
-                if (param.startsWith("token=")) {
-                    return param.substring(6);
-                }
-            }
+    // ===================== Güvenlik Yardımcı Metotları =====================
+
+    /**
+     * HTML/JS etiketlerini ve tehlikeli karakterleri HTML entity'lerine dönüştürür.
+     * XSS (Cross-Site Scripting) saldırılarını engeller.
+     */
+    private String sanitizeInput(String input) {
+        if (input == null) return null;
+        return input
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#x27;")
+                .replace("/", "&#x2F;");
+    }
+
+    /**
+     * Dosya URL'sini doğrular. Sadece http/https URL'lerine izin verir.
+     * Kötü niyetli javascript: veya data: URI şemalarını engeller.
+     */
+    private String sanitizeFileUrl(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) return null;
+        String trimmed = fileUrl.trim();
+        if (trimmed.toLowerCase().startsWith("http://") || trimmed.toLowerCase().startsWith("https://")) {
+            return sanitizeInput(trimmed);
         }
+        logger.warn("Rejected invalid file URL scheme: {}", trimmed.substring(0, Math.min(trimmed.length(), 20)));
         return null;
     }
+
+    /**
+     * E-posta adresini log'larda maskeleyerek gösterir.
+     * Örnek: "caner@example.com" → "ca***@example.com"
+     */
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) return "***";
+        String[] parts = email.split("@");
+        String local = parts[0];
+        String masked = local.length() <= 2
+                ? local + "***"
+                : local.substring(0, 2) + "***";
+        return masked + "@" + parts[1];
+    }
+
+    // ===================== Payload Sınıfları =====================
 
     @Data
     public static class IncomingMessagePayload {
