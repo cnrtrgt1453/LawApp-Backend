@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lawapp.backend.model.ChatMessage;
 import com.lawapp.backend.model.ChatSession;
 import com.lawapp.backend.model.User;
+import com.lawapp.backend.dto.RedisChatEvent;
 import com.lawapp.backend.repository.ChatMessageRepository;
 import com.lawapp.backend.repository.ChatSessionRepository;
 import com.lawapp.backend.repository.UserRepository;
 import com.lawapp.backend.service.NotificationService;
+import com.lawapp.backend.service.RedisMessagePublisher;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -20,8 +22,11 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 @Component
 @RequiredArgsConstructor
@@ -36,6 +41,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
+    private final RedisMessagePublisher redisMessagePublisher;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -46,6 +53,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
         if (email != null && Boolean.TRUE.equals(authenticated)) {
             activeSessions.put(email, session);
+            stringRedisTemplate.opsForValue().set("user:online:" + email, "true", 1, TimeUnit.DAYS);
             logger.info("WebSocket connection established for user: {}", maskEmail(email));
         } else {
             logger.warn("WebSocket connection rejected: Missing authentication attributes from handshake");
@@ -97,8 +105,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             User recipient = isClient ? chatSession.getLawyer() : chatSession.getClient();
 
             // Mesajı alıcıya gerçek zamanlı gönder
-            WebSocketSession recipientSession = activeSessions.get(recipient.getEmail());
-            
             OutgoingMessagePayload responsePayload = new OutgoingMessagePayload();
             responsePayload.setId(savedMessage.getId());
             responsePayload.setSessionId(chatSession.getId());
@@ -116,9 +122,13 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 session.sendMessage(textResponse);
             }
 
-            if (recipientSession != null && recipientSession.isOpen()) {
-                recipientSession.sendMessage(textResponse);
-                logger.info("Message sent in real-time to online user: {}", maskEmail(recipient.getEmail()));
+            Boolean isOnlineGlobally = stringRedisTemplate.hasKey("user:online:" + recipient.getEmail());
+
+            if (Boolean.TRUE.equals(isOnlineGlobally)) {
+                // Herhangi bir node üzerinde çevrimiçi ise Redis'e yayınla
+                RedisChatEvent event = new RedisChatEvent(recipient.getEmail(), jsonResponse);
+                redisMessagePublisher.publishChatEvent(event);
+                logger.info("Message published to Redis for online user: {}", maskEmail(recipient.getEmail()));
             } else {
                 // Çevrimdışı ise push notification gönder
                 notificationService.sendNotification(
@@ -126,7 +136,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                         "Yeni Mesaj: " + sender.getFullName(),
                         sanitizedContent
                 );
-                logger.info("User {} is offline. Push notification triggered.", maskEmail(recipient.getEmail()));
+                logger.info("User {} is offline globally. Push notification triggered.", maskEmail(recipient.getEmail()));
             }
 
         } catch (Exception e) {
@@ -139,7 +149,24 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         String email = (String) session.getAttributes().get("email");
         if (email != null) {
             activeSessions.remove(email);
+            stringRedisTemplate.delete("user:online:" + email);
             logger.info("WebSocket connection closed for user: {}", maskEmail(email));
+        }
+    }
+
+    /**
+     * RedisMessageSubscriber tarafından çağrılır.
+     * Kullanıcı bu node'a bağlıysa mesajı gönderir.
+     */
+    public void sendMessageToUser(String email, String messageJson) {
+        WebSocketSession session = activeSessions.get(email);
+        if (session != null && session.isOpen()) {
+            try {
+                session.sendMessage(new TextMessage(messageJson));
+                logger.info("Message delivered to local session for user: {}", maskEmail(email));
+            } catch (IOException e) {
+                logger.error("Failed to deliver message to local session for user: {}", maskEmail(email), e);
+            }
         }
     }
 

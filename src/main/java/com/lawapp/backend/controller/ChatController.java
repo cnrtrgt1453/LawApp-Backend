@@ -1,5 +1,6 @@
 package com.lawapp.backend.controller;
 
+import com.lawapp.backend.dto.ChatSessionSummaryProjection;
 import com.lawapp.backend.model.ChatMessage;
 import com.lawapp.backend.model.ChatSession;
 import com.lawapp.backend.model.User;
@@ -28,37 +29,27 @@ public class ChatController {
     public ResponseEntity<List<ChatSessionResponseDto>> getMyChats() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         try {
-            User currentUser = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
-            List<ChatSession> sessions = chatService.getMyChatSessions(email);
+            List<ChatSessionSummaryProjection> summaries = chatService.getMyChatSessionSummaries(email);
 
-            List<ChatSessionResponseDto> dtos = sessions.stream().map(session -> {
+            List<ChatSessionResponseDto> dtos = summaries.stream().map(summary -> {
                 ChatSessionResponseDto dto = new ChatSessionResponseDto();
-                dto.setId(session.getId());
-                dto.setLeadId(session.getLead().getId());
-                dto.setLeadTitle(session.getLead().getTitle());
+                dto.setId(summary.getId());
+                dto.setLeadId(summary.getLeadId());
+                dto.setLeadTitle(summary.getLeadTitle());
+                dto.setOtherParticipantName(summary.getOtherParticipantName());
+                dto.setOtherParticipantRole(summary.getOtherParticipantRole());
 
-                // Karşı tarafın bilgilerini belirle
-                User otherUser = session.getClient().getId().equals(currentUser.getId()) ?
-                        session.getLawyer() : session.getClient();
-
-                dto.setOtherParticipantName(otherUser.getFullName());
-                dto.setOtherParticipantRole(otherUser.getRole().name());
-
-                // Son mesajı ve okunmamış sayısını çek
-                ChatMessage lastMsg = chatMessageRepository.findFirstBySessionIdOrderByCreatedAtDesc(session.getId());
-                if (lastMsg != null) {
-                    dto.setLastMessage(lastMsg.getContent());
-                    dto.setLastMessageTime(lastMsg.getCreatedAt().toString());
+                if (summary.getLastMessage() != null) {
+                    dto.setLastMessage(summary.getLastMessage());
+                    dto.setLastMessageTime(summary.getLastMessageTime().toString());
                 } else {
                     dto.setLastMessage("Henüz mesaj yok. Görüşmeyi başlatın!");
-                    dto.setLastMessageTime(session.getCreatedAt().toString());
+                    // Fallback to session creation time would ideally come from summary as well,
+                    // but for simplicity we return an empty string or null if not available in projection.
+                    dto.setLastMessageTime(""); 
                 }
 
-                long unread = chatMessageRepository.countBySessionIdAndSenderIdNotAndReadFalse(
-                        session.getId(), currentUser.getId());
-                dto.setUnreadCount(unread);
-
+                dto.setUnreadCount(summary.getUnreadCount());
                 return dto;
             }).collect(Collectors.toList());
 

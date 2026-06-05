@@ -1,5 +1,6 @@
 package com.lawapp.backend.service;
 
+import com.lawapp.backend.dto.ChatSessionSummaryProjection;
 import com.lawapp.backend.model.ChatMessage;
 import com.lawapp.backend.model.ChatSession;
 import com.lawapp.backend.model.User;
@@ -26,6 +27,13 @@ public class ChatService {
 
         return chatSessionRepository.findByClientIdOrLawyerIdOrderByCreatedAtDesc(
                 currentUser.getId(), currentUser.getId());
+    }
+
+    public List<ChatSessionSummaryProjection> getMyChatSessionSummaries(String email) {
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        return chatSessionRepository.findChatSessionSummariesByUserId(currentUser.getId());
     }
 
     public List<ChatMessage> getChatMessages(String email, Long sessionId) {
