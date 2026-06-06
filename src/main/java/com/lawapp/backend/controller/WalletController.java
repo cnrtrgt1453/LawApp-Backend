@@ -6,8 +6,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.math.BigDecimal;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/wallet")
@@ -15,6 +17,7 @@ import java.math.BigDecimal;
 public class WalletController {
 
     private final WalletService walletService;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @GetMapping("/balance")
     public ResponseEntity<?> getBalance() {
@@ -29,6 +32,15 @@ public class WalletController {
     @PostMapping("/topup")
     public ResponseEntity<?> topUp(@RequestBody SecureTopUpRequest request) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        
+        // Idempotency (Double-Submit) koruması: Kullanıcı art arda tıklarsa engelle
+        String lockKey = "user:" + email + ":topup";
+        Boolean isLocked = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "locked", 3, TimeUnit.SECONDS);
+        
+        if (Boolean.FALSE.equals(isLocked)) {
+            return ResponseEntity.status(409).body("İşleminiz devam ediyor, lütfen bekleyin.");
+        }
+
         try {
             return ResponseEntity.ok(walletService.topUp(email, request.getAmount(), request.getPaymentToken()));
         } catch (Exception e) {

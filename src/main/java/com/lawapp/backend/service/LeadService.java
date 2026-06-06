@@ -7,6 +7,9 @@ import com.lawapp.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import com.lawapp.backend.util.TextSanitizerUtils;
 
 import java.util.List;
 
@@ -19,6 +22,7 @@ public class LeadService {
     private final NotificationService notificationService;
 
     @Transactional
+    @CacheEvict(value = "leads", allEntries = true)
     public Lead createLead(String email, Lead lead) {
         User client = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Client not found"));
@@ -28,6 +32,12 @@ public class LeadService {
         }
 
         lead.setClient(client);
+        
+        // KVKK Veri Maskeleme
+        if (lead.getDescription() != null) {
+            lead.setDescription(TextSanitizerUtils.maskSensitiveData(lead.getDescription()));
+        }
+
         Lead savedLead = leadRepository.save(lead);
 
         // Avukatlara haber ver
@@ -36,6 +46,7 @@ public class LeadService {
         return savedLead;
     }
 
+    @Cacheable(value = "leads")
     public List<Lead> getAllLeads() {
         return leadRepository.findAll();
     }

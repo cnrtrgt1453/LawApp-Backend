@@ -86,8 +86,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
 
-            // Mesaj içeriğini sanitize et (XSS koruması)
-            String sanitizedContent = sanitizeInput(payload.getContent());
+            // E2EE sebebiyle mesaj içeriği (content) Base64 şifreli gelecektir, HTML sanitizasyonu metni bozabilir.
+            String sanitizedContent = payload.getContent();
             String sanitizedFileUrl = sanitizeFileUrl(payload.getFileUrl());
 
             // Mesajı kaydet
