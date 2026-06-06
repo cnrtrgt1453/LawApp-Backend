@@ -4,8 +4,10 @@ import java.util.regex.Pattern;
 
 public class TextSanitizerUtils {
 
-    // Matches Turkish phone numbers e.g., 05xx xxx xx xx, 5xx-xxx-xx-xx, +905xx
-    private static final String PHONE_REGEX = "(?:(?:\\+|00)90|0?)[ -]?5[0-9]{2}[ -]?[0-9]{3}[ -]?[0-9]{2}[ -]?[0-9]{2}";
+    // "iletişim: 5321234567" → prefix grubu boşsa [ -]? ASLA tüketilmez
+    // Desteklenen formatlar: 05xx, 0 5xx, +90 5xx, 00905xx, 5321234567
+    private static final String PHONE_REGEX =
+            "(?:(?:(?:\\+|00)90|0)[ -]?)?5[0-9]{2}[ -]?[0-9]{3}[ -]?[0-9]{2}[ -]?[0-9]{2}";
     
     // A simplified list of inappropriate words
     private static final String[] PROFANITY_LIST = {"aptal", "gerizekalı", "şerefsiz", "salak"};
