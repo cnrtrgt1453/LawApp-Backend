@@ -56,4 +56,11 @@ public class AuthController {
 
         return ResponseEntity.ok("User registered successfully!");
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logoutUser() {
+        // İleride token karaliste (blacklist) işlemleri buraya eklenebilir.
+        // Şu an frontend tarafında TokenManager temizlenerek çıkış yapılıyor.
+        return ResponseEntity.ok("Logged out successfully!");
+    }
 }
