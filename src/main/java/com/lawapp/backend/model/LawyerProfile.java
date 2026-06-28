@@ -15,6 +15,7 @@ public class LawyerProfile {
     @Id
     private Long id;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToOne
     @MapsId
     @JoinColumn(name = "user_id")
