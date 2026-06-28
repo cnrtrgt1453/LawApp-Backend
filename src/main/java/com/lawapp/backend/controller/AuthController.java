@@ -39,28 +39,33 @@ public class AuthController {
 
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@RequestBody SignupRequest signUpRequest) {
-        if (userRepository.findByEmail(signUpRequest.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body("Error: Email is already in use!");
+        try {
+            if (userRepository.findByEmail(signUpRequest.getEmail()).isPresent()) {
+                return ResponseEntity.badRequest().body("Error: Email is already in use!");
+            }
+
+            User user = User.builder()
+                    .fullName(signUpRequest.getFullName())
+                    .email(signUpRequest.getEmail())
+                    .password(encoder.encode(signUpRequest.getPassword()))
+                    .role(signUpRequest.getRole())
+                    .phoneNumber(signUpRequest.getPhoneNumber())
+                    .creditBalance(signUpRequest.getRole().name().equals("LAWYER") ? BigDecimal.valueOf(100) : BigDecimal.ZERO) // Başlangıç kredisi
+                    .build();
+
+            userRepository.save(user);
+
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(signUpRequest.getEmail(), signUpRequest.getPassword()));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = jwtUtils.generateJwtToken(authentication);
+
+            return ResponseEntity.ok(new JwtResponse(jwt, user.getEmail(), user.getRole().name()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error during signup: " + e.getMessage());
         }
-
-        User user = User.builder()
-                .fullName(signUpRequest.getFullName())
-                .email(signUpRequest.getEmail())
-                .password(encoder.encode(signUpRequest.getPassword()))
-                .role(signUpRequest.getRole())
-                .phoneNumber(signUpRequest.getPhoneNumber())
-                .creditBalance(signUpRequest.getRole().name().equals("LAWYER") ? BigDecimal.valueOf(100) : BigDecimal.ZERO) // Başlangıç kredisi
-                .build();
-
-        userRepository.save(user);
-
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(signUpRequest.getEmail(), signUpRequest.getPassword()));
-
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtils.generateJwtToken(authentication);
-
-        return ResponseEntity.ok(new JwtResponse(jwt, user.getEmail(), user.getRole().name()));
     }
 
     @PostMapping("/logout")
