@@ -54,7 +54,13 @@ public class AuthController {
 
         userRepository.save(user);
 
-        return ResponseEntity.ok("User registered successfully!");
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(signUpRequest.getEmail(), signUpRequest.getPassword()));
+
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        String jwt = jwtUtils.generateJwtToken(authentication);
+
+        return ResponseEntity.ok(new JwtResponse(jwt, user.getEmail(), user.getRole().name()));
     }
 
     @PostMapping("/logout")
