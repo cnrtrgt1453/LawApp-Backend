@@ -25,9 +25,17 @@ public class LawyerProfile {
     private String bio;
 
     private String profileImageUrl;
-    private String introVideoUrl;
+    private String youtubeUrl;
     
     private String linkedinUrl;
     private String instagramUrl;
     private String websiteUrl;
+
+    public String getFullName() {
+        return user != null ? user.getFullName() : null;
+    }
+
+    public java.util.Set<String> getSpecialties() {
+        return user != null ? user.getSpecialties() : java.util.Collections.emptySet();
+    }
 }

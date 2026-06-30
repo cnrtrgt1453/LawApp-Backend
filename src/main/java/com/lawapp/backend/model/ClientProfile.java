@@ -25,4 +25,8 @@ public class ClientProfile {
     private String bio;
 
     private String profileImageUrl;
+
+    public String getFullName() {
+        return user != null ? user.getFullName() : null;
+    }
 }

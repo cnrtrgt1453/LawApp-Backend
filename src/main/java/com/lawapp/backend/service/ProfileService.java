@@ -84,6 +84,16 @@ public class ProfileService {
         profile.setLinkedinUrl(dto.getLinkedinUrl());
         profile.setInstagramUrl(dto.getInstagramUrl());
         profile.setWebsiteUrl(dto.getWebsiteUrl());
+        profile.setYoutubeUrl(dto.getYoutubeUrl());
+        
+        User user = profile.getUser();
+        if (user != null) {
+            user.getSpecialties().clear();
+            if (dto.getSpecialties() != null) {
+                user.getSpecialties().addAll(dto.getSpecialties());
+            }
+            userRepository.save(user);
+        }
         
         return profileRepository.save(profile);
     }
@@ -103,12 +113,5 @@ public class ProfileService {
         } else {
             throw new RuntimeException("Invalid user role for profile image update");
         }
-    }
-
-    @Transactional
-    public void updateIntroVideo(Long userId, String videoUrl) {
-        LawyerProfile profile = getProfile(userId);
-        profile.setIntroVideoUrl(videoUrl);
-        profileRepository.save(profile);
     }
 }

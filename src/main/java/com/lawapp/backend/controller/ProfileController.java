@@ -71,30 +71,6 @@ public class ProfileController {
         }
     }
 
-    @PostMapping("/upload-video")
-    public ResponseEntity<?> uploadVideo(@RequestParam("file") MultipartFile file) {
-        User user = getCurrentUser();
-
-        if (file.getSize() > 15 * 1024 * 1024) { // 15MB sınırı
-            return ResponseEntity.badRequest().body("Video dosyası çok büyük veya 90 saniyeden uzun (max 15MB).");
-        }
-
-        try {
-            String fileName = user.getId() + "_" + System.currentTimeMillis() + "_" + file.getOriginalFilename();
-            java.io.File uploadDir = new java.io.File("uploads/videos");
-            if (!uploadDir.exists()) {
-                uploadDir.mkdirs();
-            }
-            java.io.File dest = new java.io.File(uploadDir, fileName).getAbsoluteFile();
-            file.transferTo(dest);
-
-            String videoUrl = "/uploads/videos/" + fileName;
-            profileService.updateIntroVideo(user.getId(), videoUrl);
-            return ResponseEntity.ok().body(videoUrl);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Failed to upload video: " + e.getMessage());
-        }
-    }
 
     private User getCurrentUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();

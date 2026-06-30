@@ -81,7 +81,10 @@ public class LeadController {
                 if (lawyer.getLawyerProfile() != null) {
                     dto.setBio(lawyer.getLawyerProfile().getBio());
                     dto.setProfileImageUrl(lawyer.getLawyerProfile().getProfileImageUrl());
-                    dto.setIntroVideoUrl(lawyer.getLawyerProfile().getIntroVideoUrl());
+                    dto.setYoutubeUrl(lawyer.getLawyerProfile().getYoutubeUrl());
+                    dto.setLinkedinUrl(lawyer.getLawyerProfile().getLinkedinUrl());
+                    dto.setInstagramUrl(lawyer.getLawyerProfile().getInstagramUrl());
+                    dto.setWebsiteUrl(lawyer.getLawyerProfile().getWebsiteUrl());
                 }
                 return dto;
             }).collect(Collectors.toList());
@@ -103,7 +106,10 @@ public class LeadController {
         private boolean verified;
         private String bio;
         private String profileImageUrl;
-        private String introVideoUrl;
+        private String youtubeUrl;
+        private String linkedinUrl;
+        private String instagramUrl;
+        private String websiteUrl;
     }
 
     @Data
