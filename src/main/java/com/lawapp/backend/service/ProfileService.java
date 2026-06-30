@@ -85,6 +85,7 @@ public class ProfileService {
         profile.setInstagramUrl(dto.getInstagramUrl());
         profile.setWebsiteUrl(dto.getWebsiteUrl());
         profile.setYoutubeUrl(dto.getYoutubeUrl());
+        profile.setCity(dto.getCity());
         
         User user = profile.getUser();
         if (user != null) {

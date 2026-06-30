@@ -15,5 +15,6 @@ public class ProfileUpdateDto {
     private String instagramUrl;
     private String websiteUrl;
     private String youtubeUrl;
+    private String city;
     private java.util.List<String> specialties;
 }

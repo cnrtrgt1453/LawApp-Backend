@@ -30,6 +30,7 @@ public class LawyerProfile {
     private String linkedinUrl;
     private String instagramUrl;
     private String websiteUrl;
+    private String city;
 
     public String getFullName() {
         return user != null ? user.getFullName() : null;
