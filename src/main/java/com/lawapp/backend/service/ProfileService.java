@@ -90,9 +90,19 @@ public class ProfileService {
 
     @Transactional
     public void updateProfileImage(Long userId, String imageUrl) {
-        LawyerProfile profile = getProfile(userId);
-        profile.setProfileImageUrl(imageUrl);
-        profileRepository.save(profile);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (user.getRole() == Role.LAWYER) {
+            LawyerProfile profile = getProfile(userId);
+            profile.setProfileImageUrl(imageUrl);
+            profileRepository.save(profile);
+        } else if (user.getRole() == Role.CLIENT) {
+            ClientProfile profile = getClientProfile(userId);
+            profile.setProfileImageUrl(imageUrl);
+            clientProfileRepository.save(profile);
+        } else {
+            throw new RuntimeException("Invalid user role for profile image update");
+        }
     }
 
     @Transactional
