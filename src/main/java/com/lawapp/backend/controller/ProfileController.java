@@ -60,9 +60,9 @@ public class ProfileController {
             if (!uploadDir.exists()) {
                 uploadDir.mkdirs();
             }
-            java.io.File dest = new java.io.File(uploadDir, fileName);
+            java.io.File dest = new java.io.File(uploadDir, fileName).getAbsoluteFile();
             file.transferTo(dest);
-            
+
             String imageUrl = "/uploads/images/" + fileName;
             profileService.updateProfileImage(user.getId(), imageUrl);
             return ResponseEntity.ok().body(imageUrl);
@@ -74,9 +74,9 @@ public class ProfileController {
     @PostMapping("/upload-video")
     public ResponseEntity<?> uploadVideo(@RequestParam("file") MultipartFile file) {
         User user = getCurrentUser();
-        
+
         if (file.getSize() > 15 * 1024 * 1024) { // 15MB sınırı
-             return ResponseEntity.badRequest().body("Video dosyası çok büyük veya 90 saniyeden uzun (max 15MB).");
+            return ResponseEntity.badRequest().body("Video dosyası çok büyük veya 90 saniyeden uzun (max 15MB).");
         }
 
         try {
@@ -85,9 +85,9 @@ public class ProfileController {
             if (!uploadDir.exists()) {
                 uploadDir.mkdirs();
             }
-            java.io.File dest = new java.io.File(uploadDir, fileName);
+            java.io.File dest = new java.io.File(uploadDir, fileName).getAbsoluteFile();
             file.transferTo(dest);
-            
+
             String videoUrl = "/uploads/videos/" + fileName;
             profileService.updateIntroVideo(user.getId(), videoUrl);
             return ResponseEntity.ok().body(videoUrl);
