@@ -54,25 +54,46 @@ public class ProfileController {
     @PostMapping("/upload-image")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
         User user = getCurrentUser();
-        // Gerçek dünyada burada S3 veya yerel klasöre kayıt yapılır.
-        // Şimdilik simüle ediyoruz:
-        String imageUrl = "https://lawapp-storage.com/images/" + user.getId() + "_" + file.getOriginalFilename();
-        profileService.updateProfileImage(user.getId(), imageUrl);
-        return ResponseEntity.ok().body(imageUrl);
+        try {
+            String fileName = user.getId() + "_" + System.currentTimeMillis() + "_" + file.getOriginalFilename();
+            java.io.File uploadDir = new java.io.File("uploads/images");
+            if (!uploadDir.exists()) {
+                uploadDir.mkdirs();
+            }
+            java.io.File dest = new java.io.File(uploadDir, fileName);
+            file.transferTo(dest);
+            
+            String imageUrl = "/uploads/images/" + fileName;
+            profileService.updateProfileImage(user.getId(), imageUrl);
+            return ResponseEntity.ok().body(imageUrl);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Failed to upload image: " + e.getMessage());
+        }
     }
 
     @PostMapping("/upload-video")
     public ResponseEntity<?> uploadVideo(@RequestParam("file") MultipartFile file) {
         User user = getCurrentUser();
         
-        // 90 saniye kontrolü (simüle edilen boyut sınırını 15MB'a indiriyoruz)
         if (file.getSize() > 15 * 1024 * 1024) { // 15MB sınırı
              return ResponseEntity.badRequest().body("Video dosyası çok büyük veya 90 saniyeden uzun (max 15MB).");
         }
 
-        String videoUrl = "https://lawapp-storage.com/videos/" + user.getId() + "_" + file.getOriginalFilename();
-        profileService.updateIntroVideo(user.getId(), videoUrl);
-        return ResponseEntity.ok().body(videoUrl);
+        try {
+            String fileName = user.getId() + "_" + System.currentTimeMillis() + "_" + file.getOriginalFilename();
+            java.io.File uploadDir = new java.io.File("uploads/videos");
+            if (!uploadDir.exists()) {
+                uploadDir.mkdirs();
+            }
+            java.io.File dest = new java.io.File(uploadDir, fileName);
+            file.transferTo(dest);
+            
+            String videoUrl = "/uploads/videos/" + fileName;
+            profileService.updateIntroVideo(user.getId(), videoUrl);
+            return ResponseEntity.ok().body(videoUrl);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Failed to upload video: " + e.getMessage());
+        }
     }
 
     private User getCurrentUser() {
