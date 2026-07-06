@@ -26,18 +26,7 @@ public class AppointmentService {
     private final NotificationService notificationService;
 
     private BigDecimal getPlatformFeeByCategory(String category) {
-        if (category == null) return BigDecimal.valueOf(200.0);
-        switch (category.toLowerCase()) {
-            case "boşanma":
-            case "ceza":
-            case "ağır ceza":
-                return BigDecimal.valueOf(300.0);
-            case "iş hukuku":
-            case "ticaret hukuku":
-                return BigDecimal.valueOf(250.0);
-            default:
-                return BigDecimal.valueOf(200.0);
-        }
+        return BigDecimal.valueOf(100.0);
     }
 
     @Transactional
