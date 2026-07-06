@@ -5,6 +5,7 @@ import com.lawapp.backend.repository.AppointmentRepository;
 import com.lawapp.backend.repository.CalendarSlotRepository;
 import com.lawapp.backend.repository.LeadRepository;
 import com.lawapp.backend.repository.UserRepository;
+import com.lawapp.backend.repository.ChatSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +24,7 @@ public class AppointmentService {
     private final CalendarSlotRepository calendarSlotRepository;
     private final UserRepository userRepository;
     private final LeadRepository leadRepository;
+    private final ChatSessionRepository chatSessionRepository;
     private final NotificationService notificationService;
 
     private BigDecimal getPlatformFeeByCategory(String category) {
@@ -56,23 +58,17 @@ public class AppointmentService {
         CalendarSlot slot = calendarSlotRepository.findByLawyerIdAndSlotTime(lawyerId, appointmentTime)
                 .orElseThrow(() -> new RuntimeException("Bu saat dilimi avukatın çalışma takviminde bulunmuyor"));
 
-        if (!slot.isAvailable()) {
-            throw new RuntimeException("Seçilen saat dilimi zaten dolu");
-        }
-
-        // Çakışma kontrolü
-        boolean hasConflict = appointmentRepository.existsByLawyerIdAndAppointmentTimeAndStatusIn(
-                lawyerId, appointmentTime, Arrays.asList(AppointmentStatus.PENDING, AppointmentStatus.ACCEPTED)
+        // Çakışma kontrolü: Sadece onaylanmış randevularla çakışma olmasın, bekleyen tekliflerin birikmesine izin verilsin
+        boolean hasAcceptedConflict = appointmentRepository.existsByLawyerIdAndAppointmentTimeAndStatusIn(
+                lawyerId, appointmentTime, Arrays.asList(AppointmentStatus.ACCEPTED)
         );
-        if (hasConflict) {
-            throw new RuntimeException("Bu saat dilimi için zaten bekleyen veya onaylanmış bir randevu mevcut");
+        if (hasAcceptedConflict) {
+            throw new RuntimeException("Seçilen saat dilimi zaten dolu ve onaylanmış bir randevu mevcut");
         }
 
         BigDecimal fee = getPlatformFeeByCategory(category);
 
-        // Slotu kapat
-        slot.setAvailable(false);
-        calendarSlotRepository.save(slot);
+        // NOT: Slotu kapatmıyoruz. Slot ancak randevu kabul edildiğinde (ACCEPTED) kapatılacak.
 
         // Randevuyu oluştur (Ödeme başarılı varsayılıyor, PaymentCheckoutScreen simüle eder)
         Appointment appointment = Appointment.builder()
@@ -113,6 +109,13 @@ public class AppointmentService {
             throw new RuntimeException("Appointment is not in PENDING state");
         }
 
+        // Takvim slotunu kapat
+        calendarSlotRepository.findByLawyerIdAndSlotTime(lawyer.getId(), appointment.getAppointmentTime())
+                .ifPresent(slot -> {
+                    slot.setAvailable(false);
+                    calendarSlotRepository.save(slot);
+                });
+
         appointment.setStatus(AppointmentStatus.ACCEPTED);
         appointment.setRoomId(UUID.randomUUID().toString()); // Görüntülü konuşma odası atanır
 
@@ -124,6 +127,61 @@ public class AppointmentService {
                 "Randevunuz Onaylandı!",
                 "Av. " + lawyer.getFullName() + " randevu talebinizi onayladı. Görüşme saatinden 10 dakika önce uygulamadan arayabilirsiniz."
         );
+
+        // Reddedilmek zorunda kalan diğer müvekkillerin bekleyen randevularını bul
+        List<Appointment> pendingConflicts = appointmentRepository.findByLawyerIdAndAppointmentTimeAndStatus(
+                lawyer.getId(), appointment.getAppointmentTime(), AppointmentStatus.PENDING
+        );
+
+        for (Appointment conflictingApp : pendingConflicts) {
+            if (conflictingApp.getId().equals(appointmentId)) {
+                continue; // Kabul edilen randevuyu atla
+            }
+            // Durumunu REDDEDİLDİ yap ve iade et
+            conflictingApp.setStatus(AppointmentStatus.REJECTED);
+            conflictingApp.setPaymentStatus("REFUNDED");
+            appointmentRepository.save(conflictingApp);
+
+            // Bildirim gönder
+            notificationService.sendNotification(
+                    conflictingApp.getClient().getId(),
+                    "Randevu Talebi Çakışma Nedeniyle Reddedildi",
+                    "Av. " + lawyer.getFullName() + " bu saatteki başka bir randevu talebini onayladı. Randevunuz iptal edildi ve ücret iade edildi. Avukatınız sizinle mesajlar üzerinden iletişime geçecektir."
+            );
+
+            // Sohbet odası oluştur (avukatın müvekkile mesaj atabilmesi için)
+            Lead conflictingLead = conflictingApp.getLead();
+            if (conflictingLead == null) {
+                // Eğer randevuya bağlı ilan yoksa, müvekkilin ilk ilanını bul, yoksa yeni bir genel danışmanlık ilanı oluştur
+                conflictingLead = leadRepository.findByClientId(conflictingApp.getClient().getId()).stream().findFirst().orElse(null);
+                if (conflictingLead == null) {
+                    conflictingLead = Lead.builder()
+                            .title("Hukuki Danışmanlık Talebi")
+                            .description("Sistem tarafından otomatik oluşturulan danışmanlık ilanı.")
+                            .category("Genel Danışmanlık")
+                            .city("İstanbul")
+                            .client(conflictingApp.getClient())
+                            .status(LeadStatus.OPEN)
+                            .build();
+                    conflictingLead = leadRepository.save(conflictingLead);
+                }
+            }
+
+            ChatSession chatSession = chatSessionRepository.findByLeadIdAndLawyerId(conflictingLead.getId(), lawyer.getId())
+                    .orElse(null);
+            if (chatSession == null) {
+                chatSession = ChatSession.builder()
+                        .lead(conflictingLead)
+                        .client(conflictingApp.getClient())
+                        .lawyer(lawyer)
+                        .active(true)
+                        .build();
+                chatSessionRepository.save(chatSession);
+            } else if (!chatSession.isActive()) {
+                chatSession.setActive(true);
+                chatSessionRepository.save(chatSession);
+            }
+        }
 
         return saved;
     }

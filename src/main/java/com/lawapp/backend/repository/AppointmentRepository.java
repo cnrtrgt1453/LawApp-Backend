@@ -14,6 +14,7 @@ import java.util.List;
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
     List<Appointment> findByClientId(Long clientId);
     List<Appointment> findByLawyerId(Long lawyerId);
+    List<Appointment> findByLawyerIdAndAppointmentTimeAndStatus(Long lawyerId, LocalDateTime appointmentTime, AppointmentStatus status);
 
     @Query("SELECT COUNT(a) > 0 FROM Appointment a WHERE a.lawyer.id = :lawyerId AND a.client.id = :clientId AND a.status IN :statuses")
     boolean existsByLawyerIdAndClientIdAndStatusIn(
