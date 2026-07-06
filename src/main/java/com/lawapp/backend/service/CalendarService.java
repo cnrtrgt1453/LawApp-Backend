@@ -24,7 +24,11 @@ public class CalendarService {
     }
 
     public List<CalendarSlot> getAvailableSlotsForLawyer(Long lawyerId) {
-        return calendarSlotRepository.findByLawyerIdAndAvailableTrue(lawyerId);
+        List<CalendarSlot> slots = calendarSlotRepository.findByLawyerIdAndAvailableTrue(lawyerId);
+        LocalDateTime now = LocalDateTime.now();
+        return slots.stream()
+                .filter(slot -> slot.getSlotTime().isAfter(now))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     @Transactional
