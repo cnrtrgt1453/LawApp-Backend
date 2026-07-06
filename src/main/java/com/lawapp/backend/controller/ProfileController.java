@@ -1,6 +1,7 @@
 package com.lawapp.backend.controller;
 
 import com.lawapp.backend.dto.ProfileUpdateDto;
+import com.lawapp.backend.dto.ClientProfileUpdateDto;
 import com.lawapp.backend.model.ClientProfile;
 import com.lawapp.backend.model.LawyerProfile;
 import com.lawapp.backend.model.User;
@@ -40,9 +41,9 @@ public class ProfileController {
     }
 
     @PutMapping("/client")
-    public ResponseEntity<ClientProfile> updateClientProfile(@RequestBody String bio) {
+    public ResponseEntity<ClientProfile> updateClientProfile(@RequestBody ClientProfileUpdateDto dto) {
         User user = getCurrentUser();
-        return ResponseEntity.ok(profileService.updateClientProfile(user.getId(), bio));
+        return ResponseEntity.ok(profileService.updateClientProfile(user.getId(), dto));
     }
 
     @GetMapping("/client/{clientId}")

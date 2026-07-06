@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProfileUpdateDto {
+    private String fullName;
     private String bio;
     private String linkedinUrl;
     private String instagramUrl;

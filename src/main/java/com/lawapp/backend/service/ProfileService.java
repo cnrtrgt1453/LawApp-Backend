@@ -1,6 +1,7 @@
 package com.lawapp.backend.service;
 
 import com.lawapp.backend.dto.ProfileUpdateDto;
+import com.lawapp.backend.dto.ClientProfileUpdateDto;
 import com.lawapp.backend.model.ClientProfile;
 import com.lawapp.backend.model.LawyerProfile;
 import com.lawapp.backend.model.Role;
@@ -70,9 +71,16 @@ public class ProfileService {
     }
 
     @Transactional
-    public ClientProfile updateClientProfile(Long userId, String bio) {
+    public ClientProfile updateClientProfile(Long userId, ClientProfileUpdateDto dto) {
         ClientProfile profile = getClientProfile(userId);
-        profile.setBio(bio);
+        profile.setBio(dto.getBio());
+        
+        User user = profile.getUser();
+        if (user != null && dto.getFullName() != null && !dto.getFullName().trim().isEmpty()) {
+            user.setFullName(dto.getFullName().trim());
+            userRepository.save(user);
+        }
+        
         return clientProfileRepository.save(profile);
     }
 
@@ -89,6 +97,9 @@ public class ProfileService {
         
         User user = profile.getUser();
         if (user != null) {
+            if (dto.getFullName() != null && !dto.getFullName().trim().isEmpty()) {
+                user.setFullName(dto.getFullName().trim());
+            }
             user.getSpecialties().clear();
             if (dto.getSpecialties() != null) {
                 user.getSpecialties().addAll(dto.getSpecialties());
