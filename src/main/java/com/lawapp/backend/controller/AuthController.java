@@ -49,7 +49,7 @@ public class AuthController {
                     .email(signUpRequest.getEmail())
                     .password(encoder.encode(signUpRequest.getPassword()))
                     .role(signUpRequest.getRole())
-                    .phoneNumber(signUpRequest.getPhoneNumber())
+                    .phoneNumber(formatPhoneNumber(signUpRequest.getPhoneNumber()))
                     .creditBalance(signUpRequest.getRole().name().equals("LAWYER") ? BigDecimal.valueOf(100) : BigDecimal.ZERO) // Başlangıç kredisi
                     .build();
 
@@ -66,6 +66,29 @@ public class AuthController {
             e.printStackTrace();
             return ResponseEntity.status(500).body("Error during signup: " + e.getMessage());
         }
+    }
+
+    private String formatPhoneNumber(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return "";
+        }
+        // Remove all non-digits
+        String digits = phone.replaceAll("\\D", "");
+        
+        // Strip standard prefixes (0090, 90, 0) to extract the base 10-digit number
+        if (digits.startsWith("0090") && digits.length() == 14) {
+            digits = digits.substring(4);
+        } else if (digits.startsWith("90") && digits.length() == 12) {
+            digits = digits.substring(2);
+        } else if (digits.startsWith("0") && digits.length() == 11) {
+            digits = digits.substring(1);
+        }
+        
+        // Format if we have exactly 10 digits
+        if (digits.length() == 10) {
+            return "0(" + digits.substring(0, 3) + ") (" + digits.substring(3) + ")";
+        }
+        return phone; // Fallback to raw if unable to format
     }
 
     @PostMapping("/logout")
